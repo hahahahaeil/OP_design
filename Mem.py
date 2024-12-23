@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 
 
-# 内存管理类
 class MemoryManager:
     def __init__(self):
         self.total_memory = 128  # 总内存128K
@@ -44,8 +43,19 @@ class MemoryManager:
                 return f"分配成功：{size}K，起始地址：{block['start'] - size}K"
         return "没有足够空间进行分配！"
 
-    def release_partition(self, start):
-        """ 释放指定起始地址的分区 """
+    def release_fixed_partition(self, start):
+        """ 释放指定起始地址的固定分区 """
+        for alloc in self.allocated:
+            if alloc['start'] == start and alloc['size'] == self.fixed_partition_size:
+                self.allocated.remove(alloc)
+                self.free_memory += alloc['size']
+                # 合并回空闲块
+                self.free_blocks.append({'start': alloc['start'], 'size': alloc['size']})
+                return f"释放成功：{alloc['size']}K，起始地址：{alloc['start']}K"
+        return "未找到该固定分区！"
+
+    def release_variable_partition(self, start):
+        """ 释放指定起始地址的可变分区 """
         for alloc in self.allocated:
             if alloc['start'] == start:
                 self.allocated.remove(alloc)
@@ -64,7 +74,6 @@ class MemoryManager:
         return '\n'.join([f"起始地址：{block['start']}K，大小：{block['size']}K" for block in self.free_blocks])
 
 
-# 主程序
 class MemoryManagerApp:
     def __init__(self, root):
         self.root = root
@@ -109,14 +118,29 @@ class MemoryManagerApp:
         self.fixed_partition_window = tk.Toplevel(self.root)
         self.fixed_partition_window.title("固定分区管理")
 
-        self.btn_fixed_allocate = tk.Button(self.fixed_partition_window, text="分配空间", command=self.allocate_fixed_partition)
+        self.btn_fixed_allocate = tk.Button(self.fixed_partition_window, text="分配空间",
+                                            command=self.allocate_fixed_partition)
         self.btn_fixed_allocate.pack(padx=10, pady=5)
 
-        self.btn_fixed_release = tk.Button(self.fixed_partition_window, text="释放空间", command=self.release_partition)
-        self.btn_fixed_release.pack(padx=10, pady=5)
+
 
         self.text_fixed_allocated = tk.Text(self.fixed_partition_window, height=10, width=40)
         self.text_fixed_allocated.pack(padx=10, pady=10)
+
+
+        # 起始地址输入框
+        self.label_fixed_release = tk.Label(self.fixed_partition_window, text="请输入起始地址(K):")
+        self.label_fixed_release.pack(padx=10, pady=5)
+
+        self.entry_fixed_start = tk.Entry(self.fixed_partition_window)
+        self.entry_fixed_start.pack(padx=10, pady=5)
+
+        self.btn_fixed_release = tk.Button(self.fixed_partition_window, text="释放空间",
+                                           command=self.release_fixed_partition)
+        self.btn_fixed_release.pack(padx=10, pady=5)
+
+
+
         self.update_fixed_memory_info()
 
     def show_variable_partition_menu(self):
@@ -128,14 +152,28 @@ class MemoryManagerApp:
         self.entry_variable_size = tk.Entry(self.variable_partition_window)
         self.entry_variable_size.pack(padx=10, pady=5)
 
-        self.btn_variable_allocate = tk.Button(self.variable_partition_window, text="分配空间", command=self.allocate_variable_partition)
+        self.btn_variable_allocate = tk.Button(self.variable_partition_window, text="分配空间",
+                                               command=self.allocate_variable_partition)
         self.btn_variable_allocate.pack(padx=10, pady=5)
 
-        self.btn_variable_release = tk.Button(self.variable_partition_window, text="释放空间", command=self.release_partition)
-        self.btn_variable_release.pack(padx=10, pady=5)
+
+
+
 
         self.text_variable_allocated = tk.Text(self.variable_partition_window, height=10, width=40)
         self.text_variable_allocated.pack(padx=10, pady=10)
+
+
+        self.label_variabled_release = tk.Label(self.variable_partition_window, text="请输入起始地址(K):")
+        self.label_variabled_release.pack(padx=10, pady=5)
+
+        self.entry_variabled_start = tk.Entry(self.variable_partition_window)
+        self.entry_variabled_start.pack(padx=10, pady=5)
+
+        self.btn_variable_release = tk.Button(self.variable_partition_window, text="释放空间",
+                                              command=self.release_variable_partition)
+        self.btn_variable_release.pack(padx=10, pady=5)
+
         self.update_variable_memory_info()
 
     def allocate_fixed_partition(self):
@@ -154,31 +192,40 @@ class MemoryManagerApp:
         messagebox.showinfo("分配结果", result)
         self.update_variable_memory_info()
 
-    def release_partition(self):
-        """ 释放指定分区 """
-        start = self.entry_variable_size.get()
+    def release_fixed_partition(self):
+        """ 固定分区释放 """
+        start = self.entry_fixed_start.get()
         if not start.isdigit():
             messagebox.showerror("错误", "请输入有效的分区起始地址！")
             return
-        result = self.memory_manager.release_partition(int(start))
+        result = self.memory_manager.release_fixed_partition(int(start))
+        messagebox.showinfo("释放结果", result)
+        self.update_fixed_memory_info()
+
+    def release_variable_partition(self):
+        """ 释放指定分区 """
+        start = self.entry_variabled_start.get()
+        if not start.isdigit():
+            messagebox.showerror("错误", "请输入有效的分区起始地址！")
+            return
+        result = self.memory_manager.release_variable_partition(int(start))
         messagebox.showinfo("释放结果", result)
         self.update_variable_memory_info()
 
     def update_fixed_memory_info(self):
-        """ 更新固定分区显示信息 """
+        """ 更新固定分区的内存信息 """
+        allocated_memory = self.memory_manager.get_allocated_memory()
         self.text_fixed_allocated.delete(1.0, tk.END)
-        allocated_info = self.memory_manager.get_allocated_memory()
-        self.text_fixed_allocated.insert(tk.END, "已分配内存：\n" + allocated_info)
+        self.text_fixed_allocated.insert(tk.END, allocated_memory)
 
     def update_variable_memory_info(self):
-        """ 更新可变分区显示信息 """
+        """ 更新可变分区的内存信息 """
+        allocated_memory = self.memory_manager.get_allocated_memory()
         self.text_variable_allocated.delete(1.0, tk.END)
-        allocated_info = self.memory_manager.get_allocated_memory()
-        free_info = self.memory_manager.get_free_memory()
-        self.text_variable_allocated.insert(tk.END, "已分配分区：\n" + allocated_info + "\n\n未分配分区：\n" + free_info)
+        self.text_variable_allocated.insert(tk.END, allocated_memory)
 
 
-# 创建应用程序主窗口
-root = tk.Tk()
-app = MemoryManagerApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MemoryManagerApp(root)
+    root.mainloop()
