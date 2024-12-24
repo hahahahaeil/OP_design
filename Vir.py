@@ -35,25 +35,34 @@ def FIFO(page_sequence, frames):
 
 
 def LRU(page_sequence, frames):
-    page_faults = 0
-    memory = OrderedDict()  # 使用 OrderedDict 来保持页面的插入顺序
-    page_fault_list = []
+    page_faults = 0  # 初始化缺页次数
+    # 顺序字典 承自普通的字典（dict），但具有额外的功能：它能够记住元素的插入顺序。
+    memory = OrderedDict()  # 使用 OrderedDict 来保持页面的插入顺序，OrderedDict 按照插入顺序存储元素
+    page_fault_list = []  # 用于记录淘汰的页面，便于输出
 
+    # 遍历页面序列中的每一个页面
     for page in page_sequence:
         if page not in memory:
-            page_faults += 1
+            # 如果当前页面不在内存中，表示发生了缺页
+            page_faults += 1  # 增加缺页次数
             if len(memory) == frames:
-                print(f"内存:{memory}")
-                print(f"此时已经读到页面序列:{page}")
-                # 淘汰最久未使用的页面
-                removed_page, _ = memory.popitem(last=False)
-                page_fault_list.append(removed_page)
-                print(f"淘汰页面: {removed_page}")  # 输出淘汰的页面
-        else:
-            # 将页面移到字典的末尾表示最近使用
-            del memory[page]
-        memory[page] = None
+                # 如果内存中已经存满了页面，发生页面淘汰
+                print(f"内存: {memory}")  # 输出当前内存中的页面
+                print(f"此时已经读到页面序列: {page}")  # 输出当前正在读取的页面
 
+                # 淘汰最久未使用的页面。OrderedDict 会按照插入顺序保持元素
+                # 使用 `popitem(last=False)` 方法来移除字典中的第一个元素（即最久未使用的页面）
+                removed_page, _ = memory.popitem(last=False)
+                page_fault_list.append(removed_page)  # 记录淘汰的页面
+                print(f"淘汰页面: {removed_page}")  # 输出被淘汰的页面
+        else:
+            # 如果当前页面已经在内存中，表示没有缺页
+            # 将该页面移到字典的末尾，表示它是最近使用的页面
+            # 先删除该页面，再将它添加到末尾，确保它是最新访问的
+            del memory[page]  # 删除当前页面
+        memory[page] = None  # 将当前页面加入内存（加入时被视为最近使用的页面）
+
+    # 返回淘汰页面的列表和缺页总次数
     return page_fault_list, page_faults
 
 
